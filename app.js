@@ -8,6 +8,12 @@ const MAP_CENTER = [44.476, -73.2126]; // Burlington City Hall
 const FIT_COLORS = { 1: "#86b6ef", 2: "#5598e7", 3: "#2a78d6", 4: "#1c5cab", 5: "#104281" };
 const FIT_LABELS = { 1: "Poor", 2: "Weak", 3: "Moderate", 4: "Strong", 5: "Excellent" };
 
+// "My list": the stages a saved job moves through, in order.
+const STAGES = ["Interested", "Applied", "Interviewing", "Offer", "Not pursuing"];
+const TRACKER_KEY = "jobTracker";
+const MAX_SORT_LEVELS = 3;
+const DEFAULT_SORT = [{ key: "fit", dir: -1 }];
+
 const state = {
   rows: [],
   search: "",
@@ -20,8 +26,9 @@ const state = {
   maxMiles: null,
   minPay: null,
   tags: new Set(),
-  sortKey: "fit",
-  sortDir: -1,          // 1 = ascending, -1 = descending
+  myList: "",           // "" = any, "*" = any saved job, or a stage name
+  // Most recently clicked column first; later entries break ties. dir: 1 = ascending, -1 = descending
+  sort: structuredClone(DEFAULT_SORT),
   expanded: new Set(),  // ids of rows with details open
 };
 
@@ -65,6 +72,49 @@ function toObjects(table) {
   return body.map(r =>
     Object.fromEntries(columns.map((col, i) => [col, (r[i] ?? "").trim()]))
   );
+}
+
+// ---------- My list (saved in this browser) ----------
+
+// { [job id]: { stage, notes, updated } }. Keyed by id, so it survives updates to jobs.csv.
+let tracker = loadTracker();
+
+function loadTracker() {
+  try { return JSON.parse(localStorage.getItem(TRACKER_KEY)) || {}; }
+  catch { return {}; }
+}
+
+function saveTracker() {
+  try { localStorage.setItem(TRACKER_KEY, JSON.stringify(tracker)); }
+  catch (err) { alert(`Could not save your list: ${err.message}`); }
+}
+
+function updateTracker(id, changes) {
+  const entry = { ...tracker[id], ...changes, updated: new Date().toISOString().slice(0, 10) };
+  if (!entry.stage && !entry.notes) delete tracker[id];
+  else tracker[id] = entry;
+  saveTracker();
+}
+
+const stageOf = r => tracker[r.id]?.stage || "";
+
+function exportTracker() {
+  const blob = new Blob([JSON.stringify(tracker, null, 2)], { type: "application/json" });
+  const a = el("a", { href: URL.createObjectURL(blob), download: `my-job-list-${new Date().toISOString().slice(0, 10)}.json` });
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+async function importTracker(file) {
+  try {
+    const data = JSON.parse(await file.text());
+    if (typeof data !== "object" || data === null || Array.isArray(data)) throw new Error("not a saved list");
+    Object.assign(tracker, data);
+    saveTracker();
+    render();
+  } catch (err) {
+    alert(`Could not import ${file.name}: ${err.message}`);
+  }
 }
 
 // ---------- Normalization ----------
@@ -173,6 +223,7 @@ function el(tag, attrs = {}, ...children) {
 // ---------- Filtering & sorting ----------
 
 const COLUMNS = [
+  { key: "mine", label: "My list", value: r => (stageOf(r) ? STAGES.indexOf(stageOf(r)) : null) },
   { key: "fit", label: "Fit", value: r => r.fit, defaultDir: -1 },
   { key: "title", label: "Role", value: r => r.title },
   { key: "employment", label: "Type", value: r => r.employment_type },
@@ -184,6 +235,10 @@ const COLUMNS = [
 ];
 
 function matches(r) {
+  if (state.myList) {
+    const stage = stageOf(r);
+    if (!stage || (state.myList !== "*" && stage !== state.myList)) return false;
+  }
   if (state.openOnly && !r.open) return false;
   if (state.minFit && (r.fit ?? 0) < state.minFit) return false;
   if (state.connector && r.connectorCat !== state.connector) return false;
@@ -212,11 +267,11 @@ function compare(a, b, dir) {
 }
 
 function visibleRows() {
-  const col = COLUMNS.find(c => c.key === state.sortKey);
+  const levels = state.sort.map(s => ({ ...s, col: COLUMNS.find(c => c.key === s.key) }));
   return state.rows
     .filter(matches)
     .sort((a, b) =>
-      compare(col.value(a), col.value(b), state.sortDir) ||
+      levels.reduce((cmp, { col, dir }) => cmp || compare(col.value(a), col.value(b), dir), 0) ||
       compare(Number(b.open), Number(a.open), 1) ||
       compare(a.deadline || null, b.deadline || null, 1) ||
       compare(a.id, b.id, 1));
@@ -227,17 +282,25 @@ function visibleRows() {
 function renderHeader() {
   const tr = el("tr");
   for (const col of COLUMNS) {
-    const sorted = state.sortKey === col.key;
-    const btn = el("button", { type: "button" }, col.label);
+    const rank = state.sort.findIndex(s => s.key === col.key);
+    const dir = rank >= 0 ? (state.sort[rank].dir === 1 ? "ascending" : "descending") : null;
+    const btn = el("button", { type: "button" }, col.label,
+      rank > 0 && el("span", { className: "sort-rank", title: `Tie-breaker #${rank}` }, rank + 1));
+    // Clicking a new column makes it the main sort and keeps the previous sorts as tie-breakers.
     btn.addEventListener("click", () => {
-      if (sorted) state.sortDir *= -1;
-      else { state.sortKey = col.key; state.sortDir = col.defaultDir ?? 1; }
+      if (rank === 0) state.sort[0].dir *= -1;
+      else {
+        const prev = rank > 0 ? state.sort.splice(rank, 1)[0] : null;
+        state.sort.unshift({ key: col.key, dir: prev?.dir ?? col.defaultDir ?? 1 });
+        state.sort.length = Math.min(state.sort.length, MAX_SORT_LEVELS);
+      }
       render();
     });
     tr.append(el("th", {
       scope: "col",
       className: col.className,
-      "aria-sort": sorted ? (state.sortDir === 1 ? "ascending" : "descending") : "none",
+      "data-sort": dir,
+      "aria-sort": rank === 0 ? dir : "none",
     }, btn));
   }
   document.querySelector("#jobs thead").replaceChildren(tr);
@@ -270,7 +333,13 @@ function jobRow(r) {
     "aria-controls": `detail-${r.id}`,
   }, r.title, warning && el("span", { className: "warn-icon", title: warning, "aria-label": warning }, " ⚠"));
 
+  const stage = el("select", { className: `stage-select${stageOf(r) ? " saved" : ""}`, "aria-label": `My list status for ${r.title}` },
+    new Option("☆ Save", ""), ...STAGES.map(s => new Option(s, s)));
+  stage.value = stageOf(r);
+  stage.addEventListener("change", () => { updateTracker(r.id, { stage: stage.value }); render(); });
+
   const tr = el("tr", { className: `job${r.open ? "" : " closed"}`, id: `job-${r.id}` },
+    el("td", {}, stage),
     el("td", {}, el("span", { className: `fit fit-${r.fit}`, title: r.fit_label }, r.fit ?? "–")),
     el("td", {},
       toggle,
@@ -286,7 +355,7 @@ function jobRow(r) {
   );
 
   tr.addEventListener("click", e => {
-    if (e.target.closest("a")) return;
+    if (e.target.closest("a, select")) return;
     if (expanded) state.expanded.delete(r.id); else state.expanded.add(r.id);
     render();
     document.querySelector(`#job-${CSS.escape(r.id)} .role-title`)?.focus();
@@ -321,7 +390,15 @@ function detailRow(r) {
       source && source !== apply && el("a", { href: source, target: "_blank", rel: "noopener" }, "Source posting")),
   );
 
+  const notes = el("textarea", { className: "notes", rows: 3, placeholder: "Contacts, dates, follow-ups…", "aria-label": `My notes for ${r.title}` });
+  notes.value = tracker[r.id]?.notes || "";
+  notes.addEventListener("input", () => updateTracker(r.id, { notes: notes.value }));
+  const updated = tracker[r.id]?.updated;
+
   const right = el("div", {},
+    el("h3", {}, "My notes"),
+    notes,
+    updated && el("span", { className: "sub" }, `Last updated ${formatDate(parseISODate(updated))}`),
     el("h3", {}, "Details"),
     el("dl", {},
       field("Org type", r.org_type),
@@ -477,6 +554,18 @@ function buildControls() {
   bindSelect("min-fit", "minFit", null, Number);
   bindSelect("max-miles", "maxMiles", null, v => (v === "" ? null : Number(v)));
 
+  document.getElementById("my-list").replaceChildren(
+    new Option("Any", ""), new Option("All saved", "*"), ...STAGES.map(s => new Option(s, s)));
+  bindSelect("my-list", "myList");
+
+  document.getElementById("export").addEventListener("click", exportTracker);
+  const importFile = document.getElementById("import-file");
+  document.getElementById("import").addEventListener("click", () => importFile.click());
+  importFile.addEventListener("change", () => {
+    if (importFile.files[0]) importTracker(importFile.files[0]);
+    importFile.value = "";
+  });
+
   const minPay = document.getElementById("min-pay");
   minPay.addEventListener("input", () => {
     state.minPay = minPay.value === "" ? null : Number(minPay.value);
@@ -509,7 +598,8 @@ function buildControls() {
   document.getElementById("reset").addEventListener("click", () => {
     Object.assign(state, {
       search: "", openOnly: false, minFit: 0, connector: "", orgType: "", employment: "",
-      workMode: "", maxMiles: null, minPay: null, tags: new Set(), sortKey: "fit", sortDir: -1,
+      workMode: "", maxMiles: null, minPay: null, tags: new Set(), myList: "",
+      sort: structuredClone(DEFAULT_SORT),
     });
     state.expanded.clear();
     document.querySelectorAll(".controls select").forEach(s => (s.selectedIndex = 0));
@@ -531,8 +621,11 @@ function render() {
 
   const checked = state.rows.map(r => r.last_checked).filter(Boolean).sort().pop();
   const snapshot = checked ? ` · Status as of ${formatDate(parseISODate(checked) ?? new Date(checked))}. Postings close fast, so confirm before applying.` : "";
+  const label = key => COLUMNS.find(c => c.key === key).label;
+  const sortedBy = state.sort.map(s => label(s.key)).join(", then ");
+  const saved = state.rows.filter(stageOf).length;
   document.getElementById("status").textContent =
-    `Showing ${rows.length} of ${state.rows.length} roles${snapshot}`;
+    `Showing ${rows.length} of ${state.rows.length} roles · ${saved} on your list · Sorted by ${sortedBy}${snapshot}`;
 }
 
 async function init() {

@@ -90,7 +90,7 @@ a { color: var(--accent); }
   padding-bottom: 0.45rem;
 }
 
-input, select, button {
+input, select, textarea, button {
   font: inherit;
   padding: 0.45rem 0.6rem;
   border: 1px solid var(--border);
@@ -191,8 +191,32 @@ th button {
   font-weight: 600;
 }
 th button::after { content: " ↕"; color: var(--muted); font-size: 0.8em; }
-th[aria-sort="ascending"] button::after { content: " ▲"; color: var(--accent); }
-th[aria-sort="descending"] button::after { content: " ▼"; color: var(--accent); }
+th[data-sort="ascending"] button::after { content: " ▲"; color: var(--accent); }
+th[data-sort="descending"] button::after { content: " ▼"; color: var(--accent); }
+th[data-sort][aria-sort="none"] button::after { opacity: 0.6; }
+.sort-rank {
+  font-size: 0.7em;
+  vertical-align: super;
+  margin-left: 0.15rem;
+  color: var(--muted);
+}
+
+.stage-select {
+  font-size: 0.8rem;
+  padding: 0.2rem 0.3rem;
+  color: var(--muted);
+}
+.stage-select.saved {
+  color: var(--text);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+.notes {
+  width: 100%;
+  font-size: 0.9rem;
+  resize: vertical;
+}
 
 tr.job { cursor: pointer; }
 tr.job:hover { background: var(--row-hover); }

@@ -11,7 +11,7 @@
 <body>
   <header>
     <h1>Job Board</h1>
-    <p class="subtitle">Roles near Burlington, VT, ranked by fit. Click a row for details.</p>
+    <p class="subtitle">Roles near Burlington, VT, ranked by fit. Click a row for details. Use the first column to save roles to your list. Click column headers to sort; the column you clicked before breaks ties.</p>
   </header>
 
   <main>
@@ -19,6 +19,10 @@
       <div class="control-row">
         <input type="search" id="search" placeholder="Search titles, organizations, descriptions…" aria-label="Search">
         <label class="check"><input type="checkbox" id="open-only"> Open only</label>
+        <label>My list <select id="my-list"></select></label>
+        <button type="button" id="export" title="Download a backup of your list and notes">Export my list</button>
+        <button type="button" id="import" title="Load a list you exported earlier">Import</button>
+        <input type="file" id="import-file" accept=".json,application/json" hidden>
         <button type="button" id="reset">Reset</button>
       </div>
       <div class="control-row">

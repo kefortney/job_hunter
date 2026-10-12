@@ -4,7 +4,8 @@ A static, interactive board of job listings near Burlington, VT. You can search,
 
 ## Features
 
-- **Table** of roles, sorted by fit score by default. Click any column header to sort by it, and click again to reverse. Pay sorts by estimated hourly rate, so hourly and salaried roles sort together. Blank values always sort last.
+- **Table** of roles, sorted by fit score by default. Click any column header to sort by it, and click again to reverse. Sorting stacks: the column you clicked before becomes the tie-breaker (shown with a small number), so clicking Fit then Status puts open roles first, best fit first within each group. Up to 3 levels are kept. Pay sorts by estimated hourly rate, so hourly and salaried roles sort together. Blank values always sort last.
+- **My list**: the first column saves a role with a stage (Interested, Applied, Interviewing, Offer, Not pursuing), and each role's details have a notes box. The "My list" filter shows only saved roles or one stage. This is stored in the browser's localStorage, so it stays on that computer and browser, and it's kept when `jobs.csv` is updated as long as the `id`s stay the same. **Export my list** downloads a backup file, and **Import** restores it.
 - **Details**: click a row to see the description, requirements, how to apply, links, address, and notes.
 - **Filters**:
   - search
