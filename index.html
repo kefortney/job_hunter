@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Job Board</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>Job Board</h1>
+    <p class="subtitle">Roles near Burlington, VT, ranked by fit. Click a row for details.</p>
+  </header>
+
+  <main>
+    <section class="controls" aria-label="Filters">
+      <div class="control-row">
+        <input type="search" id="search" placeholder="Search titles, organizations, descriptions…" aria-label="Search">
+        <label class="check"><input type="checkbox" id="open-only"> Open only</label>
+        <button type="button" id="reset">Reset</button>
+      </div>
+      <div class="control-row">
+        <label>Min fit
+          <select id="min-fit">
+            <option value="0">Any</option>
+            <option value="5">5 – Excellent</option>
+            <option value="4">4+ – Strong</option>
+            <option value="3">3+ – Moderate</option>
+            <option value="2">2+ – Weak</option>
+          </select>
+        </label>
+        <label>Connector compatible <select id="connector"></select></label>
+        <label>Org type <select id="org-type"></select></label>
+        <label>Employment <select id="employment"></select></label>
+        <label>Work mode <select id="work-mode"></select></label>
+        <label>Max distance
+          <select id="max-miles">
+            <option value="">Any</option>
+            <option value="5">≤ 5 mi</option>
+            <option value="15">≤ 15 mi</option>
+            <option value="30">≤ 30 mi</option>
+          </select>
+        </label>
+        <label>Min pay ($/hr)
+          <input type="number" id="min-pay" min="0" step="1" placeholder="Any" title="Roles with no posted pay are always shown">
+        </label>
+      </div>
+      <div id="tags" class="tags" role="group" aria-label="Filter by tag"></div>
+    </section>
+
+    <p id="status" class="status" aria-live="polite">Loading listings…</p>
+
+    <section class="map-section" aria-label="Map">
+      <div id="map"></div>
+      <div class="legend" id="legend"></div>
+    </section>
+
+    <div class="table-wrap">
+      <table id="jobs">
+        <thead></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="app.js"></script>
+</body>
+</html>
